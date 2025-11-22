@@ -10,3 +10,4 @@
 - Core features are now working
 
 Added minor note to confirm contribution in Week 2 (Laiba)
+Added minor note to confirm contribution in Week 2 (Ariba)
