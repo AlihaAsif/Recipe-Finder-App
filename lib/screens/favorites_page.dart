@@ -1,60 +1,105 @@
 import 'package:flutter/material.dart';
+import '../models/recipe.dart';
+import '../services/favorites_service.dart';
+import 'recipe_details_page.dart';
 
-class FavoritesPage extends StatelessWidget {
+class FavoritesPage extends StatefulWidget {
   const FavoritesPage({super.key});
 
-  // ✅ Function to build one horizontal recipe card
-  Widget recipeCard(String title, String imagePath) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      elevation: 5,
-      clipBehavior: Clip.hardEdge,
-      child: Row(
-        children: [
-          // --- Left side: Recipe Image ---
-          Container(
-            height: 100,
-            width: 100,
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage(imagePath),
-                fit: BoxFit.cover,
+  @override
+  State<FavoritesPage> createState() => _FavoritesPageState();
+}
+
+class _FavoritesPageState extends State<FavoritesPage> {
+  List<Recipe> _favoriteRecipes = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavorites();
+  }
+
+  Future<void> _loadFavorites() async {
+    try {
+      final favorites = await FavoritesService.getFavorites();
+      setState(() {
+        _favoriteRecipes = favorites;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _toggleFavorite(Recipe recipe) async {
+    await FavoritesService.removeFromFavorites(recipe.id);
+    await _loadFavorites();  // reload
+  }
+
+  Widget recipeCard(Recipe recipe) {
+    return GestureDetector(
+      onLongPress: () => _toggleFavorite(recipe),   // DELETE on long press
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        elevation: 5,
+        clipBehavior: Clip.hardEdge,
+        child: Row(
+          children: [
+            Container(
+              height: 100,
+              width: 100,
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(recipe.image),
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
-          ),
-
-          const SizedBox(width: 10),
-
-          // --- Right side: Text & Icon ---
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.green,
-                  ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => RecipeDetailsPage(recipe: recipe),
+                    ),
+                  );
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      recipe.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'Cooking time: ${recipe.cookingTime} mins',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 5),
-                const Text(
-                  'Delicious and easy to make!',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-
-          // --- Favorite Icon ---
-          const Icon(Icons.favorite, color: Colors.red),
-          const SizedBox(width: 10),
-        ],
+            IconButton(
+              icon: const Icon(Icons.favorite, color: Colors.red),
+              onPressed: () => _toggleFavorite(recipe),
+            ),
+            const SizedBox(width: 10),
+          ],
+        ),
       ),
     );
   }
@@ -71,15 +116,21 @@ class FavoritesPage extends StatelessWidget {
         centerTitle: true,
         backgroundColor: Colors.green,
       ),
-      body: SingleChildScrollView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _favoriteRecipes.isEmpty
+          ? const Center(
+        child: Text(
+          'No favorite recipes yet!',
+          style: TextStyle(fontSize: 18, color: Colors.grey),
+        ),
+      )
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          children: [
-            // --- Only Recipe Cards ---
-            recipeCard('Pancakes', 'assets/pancake.jpg'),
-            recipeCard('Biryani', 'assets/biryani.jpg'),
-            recipeCard('Salad Bowl', 'assets/caesarsalad.jpg'),
-          ],
+          children: _favoriteRecipes
+              .map((recipe) => recipeCard(recipe))
+              .toList(),
         ),
       ),
     );

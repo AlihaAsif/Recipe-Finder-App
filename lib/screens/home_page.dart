@@ -1,10 +1,55 @@
 import 'package:flutter/material.dart';
-import '../widgets/app_drawer.dart'; // use relative import while developing
+import '../widgets/app_drawer.dart';
+import '../models/recipe.dart';
+import '../services/recipe_service.dart';
+import 'recipe_details_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
-  Widget recipeCard(String title, String imagePath) {
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  List<Recipe> _recipes = [];
+  List<Recipe> _filteredRecipes = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecipes();
+  }
+
+  Future<void> _loadRecipes() async {
+    try {
+      final recipes = await RecipeService.loadRecipes();
+      setState(() {
+        _recipes = recipes;
+        _filteredRecipes = recipes;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _searchRecipes(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredRecipes = _recipes;
+      } else {
+        _filteredRecipes = _recipes.where((recipe) =>
+            recipe.title.toLowerCase().contains(query.toLowerCase())
+        ).toList();
+      }
+    });
+  }
+
+  Widget recipeCard(Recipe recipe) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
@@ -12,31 +57,41 @@ class HomePage extends StatelessWidget {
       ),
       elevation: 5,
       clipBehavior: Clip.hardEdge,
-      child: Row(
-        children: [
-          Container(
-            height: 100,
-            width: 100,
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage(imagePath),
-                fit: BoxFit.cover,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RecipeDetailsPage(recipe: recipe),
+            ),
+          );
+        },
+        child: Row(
+          children: [
+            Container(
+              height: 100,
+              width: 100,
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(recipe.image),
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                recipe.title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
-          const Icon(Icons.arrow_forward_ios, color: Colors.green),
-          const SizedBox(width: 10),
-        ],
+            const Icon(Icons.arrow_forward_ios, color: Colors.green),
+            const SizedBox(width: 10),
+          ],
+        ),
       ),
     );
   }
@@ -54,7 +109,9 @@ class HomePage extends StatelessWidget {
         centerTitle: true,
       ),
       drawer: const AppDrawer(),
-      body: SingleChildScrollView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -80,13 +137,14 @@ class HomePage extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
-                child: const TextField(
-                  decoration: InputDecoration(
+                child: TextField(
+                  decoration: const InputDecoration(
                     hintText: 'Search recipes...',
                     prefixIcon: Icon(Icons.search),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.all(15),
                   ),
+                  onChanged: _searchRecipes,
                 ),
               ),
               const SizedBox(height: 25),
@@ -103,14 +161,10 @@ class HomePage extends StatelessWidget {
               const SizedBox(height: 15),
 
               Column(
-                children: [
-                  recipeCard('Pasta Primavera', 'assets/pasta.jpg'),
-                  recipeCard('Avocado Salad', 'assets/salad.jpg'),
-                  recipeCard('Chicken Biryani', 'assets/biryani.jpg'),
-                  recipeCard('Special Pizza', 'assets/pizza.jpg'),
-                  recipeCard('Chocolate Cake', 'assets/cake.jpg'),
-                  recipeCard('Halwa Puri', 'assets/halwapuri.jpg'),
-                ],
+                children: _filteredRecipes
+                    .where((recipe) => recipe.tags.contains('featured'))
+                    .map((recipe) => recipeCard(recipe))
+                    .toList(),
               ),
             ],
           ),

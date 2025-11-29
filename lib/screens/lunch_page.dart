@@ -1,40 +1,81 @@
 import 'package:flutter/material.dart';
-import 'package:recipe_finderapp/widgets/app_drawer.dart';
+import '../widgets/app_drawer.dart';
+import '../models/recipe.dart';
+import '../services/recipe_service.dart';
+import 'recipe_details_page.dart';
 
-class LunchPage extends StatelessWidget {
+class LunchPage extends StatefulWidget {
   const LunchPage({super.key});
 
-  Widget recipeCard(String title, String imagePath) {
+  @override
+  State<LunchPage> createState() => _LunchPageState();
+}
+
+class _LunchPageState extends State<LunchPage> {
+  List<Recipe> _recipes = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecipes();
+  }
+
+  Future<void> _loadRecipes() async {
+    try {
+      final recipes = await RecipeService.getRecipesByCategory('lunch');
+      setState(() {
+        _recipes = recipes;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Widget recipeCard(Recipe recipe) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       elevation: 5,
       clipBehavior: Clip.hardEdge,
-      child: Row(
-        children: [
-          Container(
-            height: 100,
-            width: 100,
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage(imagePath),
-                fit: BoxFit.cover,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RecipeDetailsPage(recipe: recipe),
+            ),
+          );
+        },
+        child: Row(
+          children: [
+            Container(
+              height: 100,
+              width: 100,
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(recipe.image),
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                recipe.title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
-          const Icon(Icons.arrow_forward_ios, color: Colors.green),
-          const SizedBox(width: 10),
-        ],
+            const Icon(Icons.arrow_forward_ios, color: Colors.green),
+            const SizedBox(width: 10),
+          ],
+        ),
       ),
     );
   }
@@ -50,9 +91,22 @@ class LunchPage extends StatelessWidget {
         ),
         backgroundColor: Colors.green.shade700,
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              showSearch(
+                context: context,
+                delegate: _RecipeSearchDelegate(_recipes),
+              );
+            },
+          ),
+        ],
       ),
-      drawer: const AppDrawer(), // ✅ Drawer added
-      body: SingleChildScrollView(
+      drawer: const AppDrawer(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,13 +132,78 @@ class LunchPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 15),
-            recipeCard('Grilled Chicken with Rice', 'assets/chickenrice.jpg'),
-            recipeCard('Veggie Wrap', 'assets/vegie_wrap.jpg'),
-            recipeCard('Spaghetti Bolognese', 'assets/spaghetti.jpg'),
-            recipeCard('Caesar Salad', 'assets/caesarsalad.jpg'),
+            ..._recipes.map((recipe) => recipeCard(recipe)),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _RecipeSearchDelegate extends SearchDelegate {
+  final List<Recipe> recipes;
+
+  _RecipeSearchDelegate(this.recipes);
+
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, null);
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    final results = recipes.where((recipe) =>
+    recipe.title.toLowerCase().contains(query.toLowerCase()) ||
+        recipe.ingredients.any((ingredient) => ingredient.toLowerCase().contains(query.toLowerCase()))
+    ).toList();
+
+    return _buildSearchResults(results);
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    final results = recipes.where((recipe) =>
+        recipe.title.toLowerCase().contains(query.toLowerCase())
+    ).toList();
+
+    return _buildSearchResults(results);
+  }
+
+  Widget _buildSearchResults(List<Recipe> results) {
+    return ListView.builder(
+      itemCount: results.length,
+      itemBuilder: (context, index) {
+        final recipe = results[index];
+        return ListTile(
+          leading: Image.asset(recipe.image, width: 50, height: 50, fit: BoxFit.cover),
+          title: Text(recipe.title),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RecipeDetailsPage(recipe: recipe),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
