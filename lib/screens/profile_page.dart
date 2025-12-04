@@ -75,6 +75,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     try {
       User? user;
+
       if (_isLogin) {
         user = await _authService.signInWithEmail(
           _emailController.text.trim(),
@@ -91,9 +92,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (user != null) {
         _showSnackBar('Successfully ${_isLogin ? 'signed in' : 'signed up'}!');
-        if (mounted) {
-          Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-        }
+
+        // 🔹 Navigate to MainScaffold with bottom nav bar
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       } else {
         _showSnackBar('Authentication failed. Please try again.');
       }
@@ -127,6 +128,56 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  // ⭐ Forgot Password Feature
+  void _showForgotPasswordDialog() {
+    final TextEditingController emailController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reset Password'),
+          content: TextField(
+            controller: emailController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              hintText: 'Enter your email',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                _resetPassword(emailController.text.trim());
+              },
+              child: const Text('Send Reset Link'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _resetPassword(String email) async {
+    if (email.isEmpty) {
+      _showSnackBar('Please enter your email');
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      _showSnackBar('Password reset email sent to $email');
+      Navigator.pop(context); // close dialog
+    } catch (e) {
+      _showSnackBar('Error: ${e.toString()}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLoggedIn = _authService.currentUser != null;
@@ -145,7 +196,6 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               const SizedBox(height: 40),
               const CircleAvatar(
@@ -167,10 +217,7 @@ class _ProfilePageState extends State<ProfilePage> {
               if (isLoggedIn) ...[
                 Text(
                   'Logged in as: ${_authService.currentUser!.email}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black87,
-                  ),
+                  style: const TextStyle(fontSize: 16, color: Colors.black87),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 30),
@@ -192,7 +239,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
               ] else ...[
-                // --- Email Field ---
                 TextField(
                   controller: _emailController,
                   decoration: InputDecoration(
@@ -200,10 +246,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     hintText: 'Enter your email',
                     filled: true,
                     fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 15,
-                      horizontal: 20,
-                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(30),
                       borderSide: BorderSide.none,
@@ -212,8 +255,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 const SizedBox(height: 15),
-
-                // --- Password Field ---
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
@@ -222,10 +263,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     hintText: 'Enter your password',
                     filled: true,
                     fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 15,
-                      horizontal: 20,
-                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(30),
                       borderSide: BorderSide.none,
@@ -234,8 +272,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 const SizedBox(height: 25),
-
-                // --- Login/Signup Button ---
                 _isLoading
                     ? const CircularProgressIndicator()
                     : SizedBox(
@@ -252,14 +288,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: Text(
                       _isLogin ? 'Login' : 'Sign Up',
                       style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
+                          fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                   ),
                 ),
                 const SizedBox(height: 20),
-
                 TextButton(
                   onPressed: () {
                     setState(() {
@@ -273,11 +306,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     style: const TextStyle(color: Colors.green, fontSize: 16),
                   ),
                 ),
-
                 TextButton(
-                  onPressed: () {
-                    _showSnackBar('Password reset feature coming soon!');
-                  },
+                  onPressed: _showForgotPasswordDialog,
                   child: const Text(
                     'Forgot Password?',
                     style: TextStyle(color: Colors.green, fontSize: 16),

@@ -11,13 +11,30 @@ class RecipeDetailsPage extends StatefulWidget {
   State<RecipeDetailsPage> createState() => _RecipeDetailsPageState();
 }
 
-class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
+class _RecipeDetailsPageState extends State<RecipeDetailsPage>
+    with SingleTickerProviderStateMixin {
   bool _isFavorite = false;
+
+  // ❤️ Heart Animation Controller
+  late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
     _checkIfFavorite();
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+      lowerBound: 0.8,
+      upperBound: 1.2,
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkIfFavorite() async {
@@ -27,15 +44,73 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
     });
   }
 
+  // ⭐ Toggle Favorite with Animation & Popup ⭐
   Future<void> _toggleFavorite() async {
+    // Play heart animation
+    _animationController.forward().then((_) => _animationController.reverse());
+
     if (_isFavorite) {
       await FavoritesService.removeFromFavorites(widget.recipe.id);
+      _showPopup(widget.recipe.image,
+          "${widget.recipe.title} removed from favorites");
     } else {
       await FavoritesService.addToFavorites(widget.recipe);
+      _showPopup(widget.recipe.image,
+          "${widget.recipe.title} added to favorites");
     }
+
     setState(() {
       _isFavorite = !_isFavorite;
     });
+  }
+
+  // ⭐ Popup Function ⭐
+  void _showPopup(String imagePath, String message) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: Image.asset(
+                    imagePath,
+                    height: 120,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("OK"),
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -50,12 +125,21 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         backgroundColor: Colors.green.shade700,
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: Icon(
-              _isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: _isFavorite ? Colors.red : Colors.white,
-            ),
-            onPressed: _toggleFavorite,
+          // ❤️ Favorite Button with Animation
+          AnimatedBuilder(
+            animation: _animationController,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _animationController.value,
+                child: IconButton(
+                  icon: Icon(
+                    _isFavorite ? Icons.favorite : Icons.favorite_border,
+                    color: _isFavorite ? Colors.red : Colors.white,
+                  ),
+                  onPressed: _toggleFavorite,
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -98,14 +182,16 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
             // Tags
             Wrap(
               spacing: 8,
-              children: widget.recipe.tags.map((tag) => Chip(
+              children: widget.recipe.tags
+                  .map((tag) => Chip(
                 label: Text(tag),
                 backgroundColor: Colors.green.shade100,
-              )).toList(),
+              ))
+                  .toList(),
             ),
             const SizedBox(height: 20),
 
-            // Ingredients Section
+            // Ingredients
             const Text(
               'Ingredients:',
               style: TextStyle(
@@ -123,30 +209,33 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
-                  children: widget.recipe.ingredients.map((ingredient) =>
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(Icons.circle, size: 8, color: Colors.green),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                ingredient,
-                                style: const TextStyle(fontSize: 16),
-                              ),
+                  children: widget.recipe.ingredients
+                      .map(
+                        (ingredient) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.circle,
+                              size: 8, color: Colors.green),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              ingredient,
+                              style: const TextStyle(fontSize: 16),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                  ).toList(),
+                    ),
+                  )
+                      .toList(),
                 ),
               ),
             ),
             const SizedBox(height: 20),
 
-            // Instructions Section
+            // Instructions
             const Text(
               'Instructions:',
               style: TextStyle(
@@ -164,45 +253,46 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
-                  children: widget.recipe.steps.asMap().entries.map((entry) =>
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: Colors.green,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '${entry.key + 1}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                  children: widget.recipe.steps.asMap().entries
+                      .map(
+                        (entry) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${entry.key + 1}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                entry.value,
-                                style: const TextStyle(fontSize: 16),
-                              ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              entry.value,
+                              style: const TextStyle(fontSize: 16),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                  ).toList(),
+                    ),
+                  )
+                      .toList(),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
           ],
         ),
       ),

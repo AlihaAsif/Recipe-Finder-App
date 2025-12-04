@@ -15,6 +15,7 @@ class _HomePageState extends State<HomePage> {
   List<Recipe> _recipes = [];
   List<Recipe> _filteredRecipes = [];
   bool _isLoading = true;
+  bool _isSearchFocused = false;
 
   @override
   void initState() {
@@ -42,57 +43,73 @@ class _HomePageState extends State<HomePage> {
       if (query.isEmpty) {
         _filteredRecipes = _recipes;
       } else {
-        _filteredRecipes = _recipes.where((recipe) =>
-            recipe.title.toLowerCase().contains(query.toLowerCase())
-        ).toList();
+        _filteredRecipes = _recipes
+            .where((recipe) =>
+            recipe.title.toLowerCase().contains(query.toLowerCase()))
+            .toList();
       }
     });
   }
 
+  // ⭐ Recipe Card with Tap Animation ⭐
   Widget recipeCard(Recipe recipe) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
-      elevation: 5,
-      clipBehavior: Clip.hardEdge,
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => RecipeDetailsPage(recipe: recipe),
-            ),
-          );
-        },
-        child: Row(
-          children: [
-            Container(
-              height: 100,
-              width: 100,
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage(recipe.image),
-                  fit: BoxFit.cover,
-                ),
+    bool _isPressed = false;
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return GestureDetector(
+          onTapDown: (_) => setState(() => _isPressed = true),
+          onTapUp: (_) {
+            setState(() => _isPressed = false);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => RecipeDetailsPage(recipe: recipe)),
+            );
+          },
+          onTapCancel: () => setState(() => _isPressed = false),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 100),
+            curve: Curves.easeOut,
+            transform: _isPressed
+                ? (Matrix4.identity()..scale(0.97))
+                : (Matrix4.identity()),
+            child: Card(
+              margin: const EdgeInsets.only(bottom: 16),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15)),
+              elevation: _isPressed ? 10 : 5,
+              clipBehavior: Clip.hardEdge,
+              child: Row(
+                children: [
+                  Container(
+                    height: 100,
+                    width: 100,
+                    decoration: BoxDecoration(
+                      image: DecorationImage(
+                        image: AssetImage(recipe.image),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      recipe.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, color: Colors.green),
+                  const SizedBox(width: 10),
+                ],
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                recipe.title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios, color: Colors.green),
-            const SizedBox(width: 10),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -131,21 +148,49 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 20),
 
-              // --- Search Bar ---
-              Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Search recipes...',
-                    prefixIcon: Icon(Icons.search),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.all(15),
-                  ),
-                  onChanged: _searchRecipes,
-                ),
+              // --- Search Bar with Animation ---
+              StatefulBuilder(
+                builder: (context, setState) {
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: _isSearchFocused
+                          ? [
+                        BoxShadow(
+                          color: Colors.green.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        )
+                      ]
+                          : [],
+                    ),
+                    child: Card(
+                      elevation: _isSearchFocused ? 8 : 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Focus(
+                        onFocusChange: (focus) {
+                          setState(() {
+                            _isSearchFocused = focus;
+                          });
+                        },
+                        child: TextField(
+                          decoration: const InputDecoration(
+                            hintText: 'Search recipes...',
+                            prefixIcon: Icon(Icons.search),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.all(15),
+                          ),
+                          onChanged: _searchRecipes,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 25),
 

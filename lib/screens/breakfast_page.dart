@@ -36,47 +36,16 @@ class _BreakfastPageState extends State<BreakfastPage> {
   }
 
   Widget recipeCard(Recipe recipe) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      elevation: 5,
-      clipBehavior: Clip.hardEdge,
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => RecipeDetailsPage(recipe: recipe),
-            ),
-          );
-        },
-        child: Row(
-          children: [
-            Container(
-              height: 100,
-              width: 100,
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage(recipe.image),
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                recipe.title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios, color: Colors.green),
-            const SizedBox(width: 10),
-          ],
-        ),
-      ),
+    return _AnimatedRecipeCard(
+      recipe: recipe,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RecipeDetailsPage(recipe: recipe),
+          ),
+        );
+      },
     );
   }
 
@@ -111,6 +80,7 @@ class _BreakfastPageState extends State<BreakfastPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Banner
             Container(
               height: 180,
               width: double.infinity,
@@ -140,70 +110,142 @@ class _BreakfastPageState extends State<BreakfastPage> {
   }
 }
 
+// ---------------- Animated Recipe Card ----------------
+class _AnimatedRecipeCard extends StatefulWidget {
+  final Recipe recipe;
+  final VoidCallback onTap;
+
+  const _AnimatedRecipeCard({required this.recipe, required this.onTap});
+
+  @override
+  State<_AnimatedRecipeCard> createState() => _AnimatedRecipeCardState();
+}
+
+class _AnimatedRecipeCardState extends State<_AnimatedRecipeCard> {
+  double _scale = 1.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _scale = 0.97),
+      onTapUp: (_) {
+        setState(() => _scale = 1.0);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _scale = 1.0),
+      child: AnimatedScale(
+        scale: _scale,
+        duration: const Duration(milliseconds: 100),
+        child: Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          elevation: 5,
+          clipBehavior: Clip.hardEdge,
+          child: Row(
+            children: [
+              Container(
+                height: 100,
+                width: 100,
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage(widget.recipe.image),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  widget.recipe.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, color: Colors.green),
+              const SizedBox(width: 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------- Multi-Ingredient Search Delegate ----------------
 class _RecipeSearchDelegate extends SearchDelegate {
   final List<Recipe> recipes;
 
   _RecipeSearchDelegate(this.recipes);
 
   @override
-  List<Widget> buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () {
-          query = '';
-        },
-      ),
-    ];
-  }
+  List<Widget> buildActions(BuildContext context) => [
+    IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
+  ];
 
   @override
-  Widget buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () {
-        close(context, null);
-      },
-    );
+  Widget buildLeading(BuildContext context) => IconButton(
+    icon: const Icon(Icons.arrow_back),
+    onPressed: () => close(context, null),
+  );
+
+  List<Recipe> _filterRecipes(String query, {bool matchAll = true}) {
+    final queryIngredients = query
+        .toLowerCase()
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    if (queryIngredients.isEmpty) return recipes;
+
+    return recipes.where((recipe) {
+      final recipeIngredients =
+      recipe.ingredients.map((e) => e.toLowerCase()).toList();
+
+      if (matchAll) {
+        // Match recipes that contain ALL query ingredients (partial match allowed)
+        return queryIngredients.every((ingredient) =>
+            recipeIngredients.any((ri) => ri.contains(ingredient)));
+      } else {
+        // Suggestions: match ANY query ingredient
+        return queryIngredients.any((ingredient) =>
+            recipeIngredients.any((ri) => ri.contains(ingredient)));
+      }
+    }).toList();
   }
 
   @override
   Widget buildResults(BuildContext context) {
-    final results = recipes.where((recipe) =>
-    recipe.title.toLowerCase().contains(query.toLowerCase()) ||
-        recipe.ingredients.any((ingredient) => ingredient.toLowerCase().contains(query.toLowerCase()))
-    ).toList();
-
+    final results = _filterRecipes(query, matchAll: true);
     return _buildSearchResults(results);
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    final results = recipes.where((recipe) =>
-        recipe.title.toLowerCase().contains(query.toLowerCase())
-    ).toList();
-
+    final results = _filterRecipes(query, matchAll: false);
     return _buildSearchResults(results);
   }
 
-  Widget _buildSearchResults(List<Recipe> results) {
-    return ListView.builder(
-      itemCount: results.length,
-      itemBuilder: (context, index) {
-        final recipe = results[index];
-        return ListTile(
-          leading: Image.asset(recipe.image, width: 50, height: 50, fit: BoxFit.cover),
-          title: Text(recipe.title),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => RecipeDetailsPage(recipe: recipe),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
+  Widget _buildSearchResults(List<Recipe> results) => ListView.builder(
+    itemCount: results.length,
+    itemBuilder: (context, index) {
+      final recipe = results[index];
+      return ListTile(
+        leading: Image.asset(recipe.image,
+            width: 50, height: 50, fit: BoxFit.cover),
+        title: Text(recipe.title),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RecipeDetailsPage(recipe: recipe),
+            ),
+          );
+        },
+      );
+    },
+  );
 }
